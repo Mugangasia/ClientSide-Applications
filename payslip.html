@@ -5,6 +5,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-beta4/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         :root {
             --primary-color: #3498db;
@@ -309,6 +311,15 @@
             <h2>Payslip Preview</h2>
             <iframe id="pdfPreview" class="hidden"></iframe>
         </div>
+
+        <!-- Bulk Preview Section -->
+        <div class="bulk-preview-section" style="display: none;">
+            <h2>Bulk Generated Payslips</h2>
+            <div id="bulkPayslipsPreview"></div>
+            <div class="btn-group">
+                <button onclick="downloadAllPayslipsAsZip()" class="btn">Download All Payslips as ZIP</button>
+            </div>
+        </div>
     </div>
     
     <!-- Hidden Payslip Template for PDF Generation -->
@@ -412,6 +423,12 @@
                     </tr>
                 </table>
             </div>
+            <div style="margin-top: 40px; border-top: 1px dashed #ddd; padding-top: 20px;">
+                <div style="font-size: 12px; color: #666; text-align: center;">
+                    <p style="margin: 5px 0;">This is a computer-generated payslip and does not require a signature.</p>
+                    <p style="margin: 5px 0;">For any queries regarding this payslip, please contact your Management.</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -421,6 +438,7 @@
         let pdfDoc = null;
         let companyLogoDataUrl = null;
         let signatureDataUrl = null;
+        let generatedPdfs = []; // Store generated PDFs
         
         // Preview the uploaded signature
         function previewSignature(event) {
@@ -581,42 +599,56 @@
         }
         
         function numberToWords(num) {
-            // Improved implementation
             if (num === 0) return "Zero Kenya Shillings Only";
             
             const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", 
                         "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
             const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
             
-            num = Math.floor(num);
+            // Handle decimal points
+            const parts = num.toFixed(2).split('.');
+            const wholeNum = parseInt(parts[0]);
+            const decimal = parseInt(parts[1]);
+            
+            function convertGroup(n) {
+                if (n === 0) return "";
+                else if (n < 20) return ones[n];
+                else if (n < 100) {
+                    return tens[Math.floor(n/10)] + (n % 10 !== 0 ? "-" + ones[n % 10] : "");
+                } else {
+                    return ones[Math.floor(n/100)] + " Hundred" + (n % 100 !== 0 ? " and " + convertGroup(n % 100) : "");
+                }
+            }
+            
             let words = "";
             
-            if (num >= 1000000) {
-                words += numberToWords(Math.floor(num / 1000000)) + " Million ";
+            // Handle billions
+            if (wholeNum >= 1000000000) {
+                words += convertGroup(Math.floor(wholeNum/1000000000)) + " Billion ";
+                num %= 1000000000;
+            }
+            
+            // Handle millions
+            if (wholeNum >= 1000000) {
+                words += convertGroup(Math.floor(wholeNum/1000000)) + " Million ";
                 num %= 1000000;
             }
             
-            if (num >= 1000) {
-                words += numberToWords(Math.floor(num / 1000)) + " Thousand ";
+            // Handle thousands
+            if (wholeNum >= 1000) {
+                words += convertGroup(Math.floor(wholeNum/1000)) + " Thousand ";
                 num %= 1000;
             }
             
-            if (num >= 100) {
-                words += ones[Math.floor(num / 100)] + " Hundred ";
-                num %= 100;
-            }
+            // Handle hundreds and remaining numbers
+            words += convertGroup(wholeNum % 1000);
             
-            if (num > 0) {
-                if (words) words += "and ";
-                
-                if (num < 20) {
-                    words += ones[num];
-                } else {
-                    words += tens[Math.floor(num / 10)];
-                    if (num % 10 > 0) {
-                        words += "-" + ones[num % 10];
-                    }
-                }
+            // Trim extra spaces and add currency
+            words = words.trim();
+            
+            // Add cents if present
+            if (decimal > 0) {
+                words += " and " + decimal + "/100";
             }
             
             return words + " Kenya Shillings Only";
@@ -679,43 +711,43 @@
                 "Loans": 0
             };
             
-const ws = XLSX.utils.json_to_sheet([template]);
+            const ws = XLSX.utils.json_to_sheet([template]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Payslip Data");
             XLSX.writeFile(wb, "payslip-template.xlsx");
         }
         
-        function processBulkUpload() {
+        async function processBulkUpload() {
             const file = document.getElementById('excelUpload').files[0];
             if (!file) {
                 alert("Please select an Excel file first");
                 return;
             }
-            
+
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(sheet);
-                
-                if (jsonData.length === 0) {
-                    alert("No data found in the Excel file");
-                    return;
-                }
-                
-                // Create a zip folder for multiple PDFs if there are multiple employees
-                if (jsonData.length > 1) {
-                    alert(`Processing ${jsonData.length} employee records. This may take a moment...`);
-                    
-                    let processedCount = 0;
-                    const processNextEmployee = (index) => {
-                        if (index >= jsonData.length) {
-                            alert(`Processed ${processedCount} employee records successfully.`);
-                            return;
-                        }
-                        
-                        const employee = jsonData[index];
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+                    if (jsonData.length === 0) {
+                        alert("No data found in the Excel file");
+                        return;
+                    }
+
+                    // Clear previous previews
+                    const previewContainer = document.getElementById('bulkPayslipsPreview');
+                    previewContainer.innerHTML = '';
+                    generatedPdfs = [];
+
+                    // Show bulk preview section
+                    document.querySelector('.bulk-preview-section').style.display = 'block';
+
+                    // Process each employee
+                    for (let i = 0; i < jsonData.length; i++) {
+                        const employee = jsonData[i];
                         
                         // Populate form with employee data
                         document.getElementById('employeeName').value = employee['Employee Name'] || '';
@@ -724,72 +756,113 @@ const ws = XLSX.utils.json_to_sheet([template]);
                         document.getElementById('payPeriod').value = employee['Pay Period'] || '';
                         document.getElementById('workedDays').value = employee['Worked Days'] || 24;
                         
-                        // Earnings
+                        // Populate earnings and deductions
                         document.getElementById('basicPay').value = employee['Basic Pay'] || 0;
                         document.getElementById('bonus').value = employee['Bonus'] || 0;
                         document.getElementById('transportAllowance').value = employee['Transport Allowance'] || 0;
                         document.getElementById('houseRentAllowance').value = employee['House Rent Allowance'] || 0;
                         document.getElementById('mealAllowance').value = employee['Meal Allowance'] || 0;
-                        
-                        // Deductions
                         document.getElementById('paye').value = employee['PAYE'] || 0;
                         document.getElementById('advance').value = employee['Advance'] || 0;
                         document.getElementById('chamaa').value = employee['CHAMAA'] || 0;
                         document.getElementById('food').value = employee['Food'] || 0;
                         document.getElementById('loans').value = employee['Loans'] || 0;
-                        
-                        // Generate payslip
-                        generatePayslip();
-                        
-                        // Download PDF
-                        setTimeout(() => {
-                            if (pdfDoc) {
-                                const employeeName = document.getElementById('employeeName').value || 'employee';
-                                const payPeriod = document.getElementById('payPeriod').value || 'period';
-                                pdfDoc.save(`payslip-${employeeName}-${payPeriod}.pdf`);
-                                processedCount++;
-                            }
-                            
-                            // Process next employee after a short delay
-                            setTimeout(() => {
-                                processNextEmployee(index + 1);
-                            }, 500);
-                        }, 1000);
-                    };
-                    
-                    // Start processing
-                    processNextEmployee(0);
-                } else {
-                    // Process single employee
-                    const employee = jsonData[0];
-                    
-                    // Populate form with employee data
-                    document.getElementById('employeeName').value = employee['Employee Name'] || '';
-                    document.getElementById('employeeId').value = employee['Employee ID'] || '';
-                    document.getElementById('joinDate').value = employee['Date of Joining'] || '';
-                    document.getElementById('payPeriod').value = employee['Pay Period'] || '';
-                    document.getElementById('workedDays').value = employee['Worked Days'] || 24;
-                    
-                    // Earnings
-                    document.getElementById('basicPay').value = employee['Basic Pay'] || 0;
-                    document.getElementById('bonus').value = employee['Bonus'] || 0;
-                    document.getElementById('transportAllowance').value = employee['Transport Allowance'] || 0;
-                    document.getElementById('houseRentAllowance').value = employee['House Rent Allowance'] || 0;
-                    document.getElementById('mealAllowance').value = employee['Meal Allowance'] || 0;
-                    
-                    // Deductions
-                    document.getElementById('paye').value = employee['PAYE'] || 0;
-                    document.getElementById('advance').value = employee['Advance'] || 0;
-                    document.getElementById('chamaa').value = employee['CHAMAA'] || 0;
-                    document.getElementById('food').value = employee['Food'] || 0;
-                    document.getElementById('loans').value = employee['Loans'] || 0;
-                    
-                    // Generate payslip
-                    generatePayslip();
-                    alert('Payslip generated. Click "Download Payslip" to save it.');
+
+                        // Generate payslip preview
+                        await generatePayslipPreview(employee, i);
+                    }
+
+                } catch (error) {
+                    console.error('Error processing bulk upload:', error);
+                    alert('Error processing bulk upload: ' + error.message);
                 }
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        async function generatePayslipPreview(employee, index) {
+            // Update preview template
+            updatePreviewTemplate();
+
+            const templateElement = document.getElementById('payslipTemplate');
+            templateElement.style.display = 'block';
+
+            try {
+                const canvas = await html2canvas(templateElement, {
+                    scale: 2,
+                    logging: false,
+                    useCORS: true
+                });
+
+                templateElement.style.display = 'none';
+
+                // Create PDF
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+                // Store PDF for later use
+                generatedPdfs.push({
+                    pdf: pdf,
+                    employeeName: employee['Employee Name'] || `Employee_${index + 1}`
+                });
+
+                // Create preview card
+                const previewCard = document.createElement('div');
+                previewCard.className = 'preview-card';
+                previewCard.style = `
+                    margin: 20px 0;
+                    padding: 15px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    background: white;
+                `;
+
+                previewCard.innerHTML = `
+                    <h3>Payslip - ${employee['Employee Name'] || `Employee ${index + 1}`}</h3>
+                    <img src="${canvas.toDataURL()}" style="max-width: 100%; height: auto; margin: 10px 0;">
+                `;
+
+                document.getElementById('bulkPayslipsPreview').appendChild(previewCard);
+
+            } catch (error) {
+                console.error('Error generating preview:', error);
+            }
+        }
+
+        async function downloadAllPayslipsAsZip() {
+            if (generatedPdfs.length === 0) {
+                alert('No payslips to download');
+                return;
+            }
+
+            try {
+                const zip = new JSZip();
+
+                // Add each PDF to the ZIP
+                for (const item of generatedPdfs) {
+                    const pdfBlob = item.pdf.output('blob');
+                    const fileName = `payslip_${item.employeeName.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+                    zip.file(fileName, pdfBlob);
+                }
+
+                // Generate and download ZIP
+                const zipContent = await zip.generateAsync({type: 'blob'});
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(zipContent);
+                downloadLink.download = 'payslips.zip';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+            } catch (error) {
+                console.error('Error creating ZIP:', error);
+                alert('Error creating ZIP file: ' + error.message);
+            }
         }
     </script>
 </body>
