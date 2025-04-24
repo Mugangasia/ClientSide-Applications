@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payslip Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-beta4/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --light-gray: #f5f5f5;
+            --dark-gray: #333;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-gray);
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-color);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--light-gray);
+            padding-bottom: 10px;
+        }
+        
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--light-gray);
+            border-radius: 5px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .signature-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background: white;
+        }
+        
+        .signature-preview {
+            max-width: 300px;
+            max-height: 150px;
+            border: 1px dashed #ccc;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: var(--secondary-color);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .section-title {
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .preview-section {
+            margin-top: 30px;
+            border-top: 2px solid var(--light-gray);
+            padding-top: 20px;
+        }
+        
+        #pdfPreview {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            margin-top: 15px;
+        }
+        
+        /* PDF Preview Styling */
+        .payslip-template {
+            display: none;
+            width: 210mm;
+            padding: 20mm;
+            box-sizing: border-box;
+        }
+        
+        .payslip-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .company-logo {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        
+        .payslip-title {
+            font-size: 24px;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Payslip Generator</h1>
+        
+        <!-- Company Details Section -->
+        <div class="form-section">
+            <h2 class="section-title">Company Details</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="companyName">Company Name</label>
+                    <input type="text" id="companyName" value="Elphrods Services LLP">
+                </div>
+                <div class="form-group">
+                    <label for="companyAddress">Company Address</label>
+                    <input type="text" id="companyAddress" value="Office Inside Manyatta Primary, Bio-Centre 1st Floor Kisumu">
+                </div>
+                <div class="form-group">
+                    <label for="companyLogo">Company Logo</label>
+                    <input type="file" id="companyLogo" accept="image/*">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Employee Details Section -->
+        <div class="form-section">
+            <h2 class="section-title">Employee Details</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="employeeName">Employee Name</label>
+                    <input type="text" id="employeeName">
+                </div>
+                <div class="form-group">
+                    <label for="employeeId">Employee ID</label>
+                    <input type="text" id="employeeId">
+                </div>
+                <div class="form-group">
+                    <label for="joinDate">Date of Joining</label>
+                    <input type="date" id="joinDate">
+                </div>
+                <div class="form-group">
+                    <label for="payPeriod">Pay Period</label>
+                    <input type="month" id="payPeriod">
+                </div>
+                <div class="form-group">
+                    <label for="workedDays">Worked Days</label>
+                    <input type="number" id="workedDays" min="1" max="31" value="24">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Earnings Section -->
+        <div class="form-section">
+            <h2 class="section-title">Earnings</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="basicPay">Basic Pay (KES)</label>
+                    <input type="number" id="basicPay" min="0" value="25000">
+                </div>
+                <div class="form-group">
+                    <label for="bonus">Bonus (KES)</label>
+                    <input type="number" id="bonus" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="transportAllowance">Transport Allowance (KES)</label>
+                    <input type="number" id="transportAllowance" min="0" value="3000">
+                </div>
+                <div class="form-group">
+                    <label for="houseRentAllowance">House Rent Allowance (KES)</label>
+                    <input type="number" id="houseRentAllowance" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="mealAllowance">Meal Allowance (KES)</label>
+                    <input type="number" id="mealAllowance" min="0" value="2000">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Deductions Section -->
+        <div class="form-section">
+            <h2 class="section-title">Deductions</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="paye">PAYE (KES)</label>
+                    <input type="number" id="paye" min="0" value="1800">
+                </div>
+                <div class="form-group">
+                    <label for="advance">Advance (KES)</label>
+                    <input type="number" id="advance" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="chamaa">CHAMAA (KES)</label>
+                    <input type="number" id="chamaa" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="food">Food (prorated) (KES)</label>
+                    <input type="number" id="food" min="0" value="0">
+                </div>
+                <div class="form-group">
+                    <label for="loans">Loans (KES)</label>
+                    <input type="number" id="loans" min="0" value="0">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Signature Section -->
+        <div class="form-section">
+            <h2 class="section-title">Signature Upload</h2>
+            <div class="signature-container">
+                <div class="form-group">
+                    <label for="signatureUpload">Upload Signature Image</label>
+                    <input type="file" id="signatureUpload" accept="image/*" onchange="previewSignature(event)">
+                    <img id="signaturePreview" class="signature-preview" alt="Signature Preview">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="btn-group">
+            <button onclick="generatePayslip()" class="btn">Generate Payslip</button>
+            <button onclick="downloadPayslip()" class="btn">Download Payslip</button>
+            <button onclick="resetForm()" class="btn btn-secondary">Reset Form</button>
+        </div>
+        
+        <!-- Bulk Upload Section -->
+        <div class="form-section">
+            <h2 class="section-title">Bulk Upload</h2>
+            <div class="form-group">
+                <label for="excelUpload">Upload Excel File</label>
+                <input type="file" id="excelUpload" accept=".xlsx,.xls">
+            </div>
+            <div class="btn-group">
+                <button onclick="downloadTemplate()" class="btn btn-secondary">Download Template</button>
+                <button onclick="processBulkUpload()" class="btn">Process Excel</button>
+            </div>
+        </div>
+        
+        <!-- Preview Section -->
+        <div class="preview-section">
+            <h2>Payslip Preview</h2>
+            <iframe id="pdfPreview" class="hidden"></iframe>
+        </div>
+    </div>
+    
+    <!-- Hidden Payslip Template for PDF Generation -->
+    <div id="payslipTemplate" class="payslip-template">
+        <div class="payslip-header">
+            <img id="companyLogoPreview" class="company-logo" alt="Company Logo">
+            <div class="payslip-title">EMPLOYEE PAYSLIP</div>
+            <div id="companyNamePreview" class="company-name"></div>
+            <div id="companyAddressPreview" class="company-address"></div>
+        </div>
+        <div class="payslip-content">
+            <div class="employee-details">
+                <table width="100%" style="border-collapse: collapse;">
+                    <tr>
+                        <td width="50%"><strong>Employee Name:</strong> <span id="employeeNamePreview"></span></td>
+                        <td width="50%"><strong>Employee ID:</strong> <span id="employeeIdPreview"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Date of Joining:</strong> <span id="joinDatePreview"></span></td>
+                        <td><strong>Pay Period:</strong> <span id="payPeriodPreview"></span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Worked Days:</strong> <span id="workedDaysPreview"></span></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+            <div style="margin-top: 20px;">
+                <table width="100%" style="border-collapse: collapse; border: 1px solid #ddd;">
+                    <thead>
+                        <tr style="background-color: #3498db; color: white;">
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Earnings</th>
+                            <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Amount (KES)</th>
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Deductions</th>
+                            <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Amount (KES)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Basic Pay</td>
+                            <td id="basicPayPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">PAYE</td>
+                            <td id="payePreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Bonus</td>
+                            <td id="bonusPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Advance</td>
+                            <td id="advancePreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Transport Allowance</td>
+                            <td id="transportAllowancePreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">CHAMAA</td>
+                            <td id="chamaaPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">House Rent Allowance</td>
+                            <td id="houseRentAllowancePreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Food (prorated)</td>
+                            <td id="foodPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Meal Allowance</td>
+                            <td id="mealAllowancePreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Loans</td>
+                            <td id="loansPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd;"></td>
+                        </tr>
+                        <tr style="background-color: #f9f9f9;">
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Earnings</strong></td>
+                            <td id="totalEarningsPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold;"></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Deductions</strong></td>
+                            <td id="totalDeductionsPreview" style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold;"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd;">
+                <table width="100%" style="border-collapse: collapse;">
+                    <tr>
+                        <td width="50%"><strong>Net Pay (KES):</strong></td>
+                        <td id="netPayPreview" width="50%" style="text-align: right; font-weight: bold; font-size: 18px;"></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="padding-top: 10px;"><strong>Amount In Words:</strong> <span id="amountInWordsPreview"></span></td>
+                    </tr>
+                </table>
+            </div>
+            <div style="margin-top: 40px;">
+                <table width="100%" style="border-collapse: collapse;">
+                    <tr>
+                        <td width="50%" style="vertical-align: bottom;">
+                            <img id="signatureImagePreview" style="max-width: 150px; max-height: 50px;" alt="Employee Signature">
+                            <div style="margin-top: 5px; border-top: 1px solid #000; width: 150px;"></div>
+                            <div>Employee Signature</div>
+                        </td>
+                        <td width="50%" style="vertical-align: bottom; text-align: right;">
+                            <div style="margin-top: 5px; border-top: 1px solid #000; width: 150px; display: inline-block;"></div>
+                            <div>Authorised Signature</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize jsPDF
+        const { jsPDF } = window.jspdf;
+        let pdfDoc = null;
+        let companyLogoDataUrl = null;
+        let signatureDataUrl = null;
+        
+        // Preview the uploaded signature
+        function previewSignature(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    signatureDataUrl = e.target.result;
+                    const preview = document.getElementById('signaturePreview');
+                    preview.src = signatureDataUrl;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Handle company logo upload
+        document.getElementById('companyLogo').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    companyLogoDataUrl = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Update the preview template with form values
+        function updatePreviewTemplate() {
+            // Company details
+            document.getElementById('companyNamePreview').textContent = document.getElementById('companyName').value;
+            document.getElementById('companyAddressPreview').textContent = document.getElementById('companyAddress').value;
+            if (companyLogoDataUrl) {
+                document.getElementById('companyLogoPreview').src = companyLogoDataUrl;
+                document.getElementById('companyLogoPreview').style.display = 'block';
+            } else {
+                document.getElementById('companyLogoPreview').style.display = 'none';
+            }
+            
+            // Employee details
+            document.getElementById('employeeNamePreview').textContent = document.getElementById('employeeName').value;
+            document.getElementById('employeeIdPreview').textContent = document.getElementById('employeeId').value;
+            document.getElementById('joinDatePreview').textContent = formatDate(document.getElementById('joinDate').value);
+            document.getElementById('payPeriodPreview').textContent = formatMonth(document.getElementById('payPeriod').value);
+            document.getElementById('workedDaysPreview').textContent = document.getElementById('workedDays').value;
+            
+            // Earnings
+            const basicPay = parseFloat(document.getElementById('basicPay').value) || 0;
+            const bonus = parseFloat(document.getElementById('bonus').value) || 0;
+            const transportAllowance = parseFloat(document.getElementById('transportAllowance').value) || 0;
+            const houseRentAllowance = parseFloat(document.getElementById('houseRentAllowance').value) || 0;
+            const mealAllowance = parseFloat(document.getElementById('mealAllowance').value) || 0;
+            
+            document.getElementById('basicPayPreview').textContent = formatCurrency(basicPay);
+            document.getElementById('bonusPreview').textContent = formatCurrency(bonus);
+            document.getElementById('transportAllowancePreview').textContent = formatCurrency(transportAllowance);
+            document.getElementById('houseRentAllowancePreview').textContent = formatCurrency(houseRentAllowance);
+            document.getElementById('mealAllowancePreview').textContent = formatCurrency(mealAllowance);
+            
+            const totalEarnings = basicPay + bonus + transportAllowance + houseRentAllowance + mealAllowance;
+            document.getElementById('totalEarningsPreview').textContent = formatCurrency(totalEarnings);
+            
+            // Deductions
+            const paye = parseFloat(document.getElementById('paye').value) || 0;
+            const advance = parseFloat(document.getElementById('advance').value) || 0;
+            const chamaa = parseFloat(document.getElementById('chamaa').value) || 0;
+            const food = parseFloat(document.getElementById('food').value) || 0;
+            const loans = parseFloat(document.getElementById('loans').value) || 0;
+            
+            document.getElementById('payePreview').textContent = formatCurrency(paye);
+            document.getElementById('advancePreview').textContent = formatCurrency(advance);
+            document.getElementById('chamaaPreview').textContent = formatCurrency(chamaa);
+            document.getElementById('foodPreview').textContent = formatCurrency(food);
+            document.getElementById('loansPreview').textContent = formatCurrency(loans);
+            
+            const totalDeductions = paye + advance + chamaa + food + loans;
+            document.getElementById('totalDeductionsPreview').textContent = formatCurrency(totalDeductions);
+            
+            // Net Pay
+            const netPay = totalEarnings - totalDeductions;
+            document.getElementById('netPayPreview').textContent = formatCurrency(netPay);
+            document.getElementById('amountInWordsPreview').textContent = numberToWords(netPay);
+            
+            // Signature
+            if (signatureDataUrl) {
+                document.getElementById('signatureImagePreview').src = signatureDataUrl;
+                document.getElementById('signatureImagePreview').style.display = 'block';
+            } else {
+                document.getElementById('signatureImagePreview').style.display = 'none';
+            }
+        }
+        
+        // Generate Payslip
+        function generatePayslip() {
+            // Update the preview template with current form values
+            updatePreviewTemplate();
+            
+            // Make the template visible
+            const templateElement = document.getElementById('payslipTemplate');
+            templateElement.style.display = 'block';
+            
+            // Use html2canvas to capture the template as an image
+            html2canvas(templateElement, {
+                scale: 2,
+                logging: false,
+                useCORS: true
+            }).then(canvas => {
+                // Hide the template again
+                templateElement.style.display = 'none';
+                
+                // Create PDF
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210; // A4 width in mm
+                const pageHeight = 297; // A4 height in mm
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                
+                // Save PDF document for later use
+                pdfDoc = pdf;
+                
+                // Display PDF preview
+                const pdfBlob = pdf.output('blob');
+                const pdfUrl = URL.createObjectURL(pdfBlob);
+                document.getElementById('pdfPreview').src = pdfUrl;
+                document.getElementById('pdfPreview').classList.remove('hidden');
+            });
+        }
+        
+        // Download PDF
+        function downloadPayslip() {
+            if (pdfDoc) {
+                const employeeName = document.getElementById('employeeName').value || 'employee';
+                const payPeriod = document.getElementById('payPeriod').value || 'period';
+                pdfDoc.save(`payslip-${employeeName}-${payPeriod}.pdf`);
+            } else {
+                alert('Please generate a payslip first.');
+            }
+        }
+        
+        // Helper functions
+        function formatCurrency(amount) {
+            return amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-GB');
+        }
+        
+        function formatMonth(monthString) {
+            if (!monthString) return '';
+            const date = new Date(monthString);
+            return date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long' });
+        }
+        
+        function numberToWords(num) {
+            // Improved implementation
+            if (num === 0) return "Zero Kenya Shillings Only";
+            
+            const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", 
+                        "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+            const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+            
+            num = Math.floor(num);
+            let words = "";
+            
+            if (num >= 1000000) {
+                words += numberToWords(Math.floor(num / 1000000)) + " Million ";
+                num %= 1000000;
+            }
+            
+            if (num >= 1000) {
+                words += numberToWords(Math.floor(num / 1000)) + " Thousand ";
+                num %= 1000;
+            }
+            
+            if (num >= 100) {
+                words += ones[Math.floor(num / 100)] + " Hundred ";
+                num %= 100;
+            }
+            
+            if (num > 0) {
+                if (words) words += "and ";
+                
+                if (num < 20) {
+                    words += ones[num];
+                } else {
+                    words += tens[Math.floor(num / 10)];
+                    if (num % 10 > 0) {
+                        words += "-" + ones[num % 10];
+                    }
+                }
+            }
+            
+            return words + " Kenya Shillings Only";
+        }
+        
+        function resetForm() {
+            // Reset form fields
+            const inputs = document.querySelectorAll('input:not([type="file"])');
+            inputs.forEach(input => {
+                if (input.type === 'number') {
+                    if (input.id === 'basicPay') {
+                        input.value = 25000;
+                    } else if (input.id === 'transportAllowance') {
+                        input.value = 3000;
+                    } else if (input.id === 'mealAllowance') {
+                        input.value = 2000;
+                    } else if (input.id === 'paye') {
+                        input.value = 1800;
+                    } else if (input.id === 'workedDays') {
+                        input.value = 24;
+                    } else {
+                        input.value = 0;
+                    }
+                } else {
+                    input.value = '';
+                }
+            });
+            
+            // Reset company name and address to default values
+            document.getElementById('companyName').value = 'Elphrods Services LLP';
+            document.getElementById('companyAddress').value = 'Office Inside Manyatta Primary, Bio-Centre 1st Floor Kisumu';
+            
+            // Reset signature and logo
+            document.getElementById('signaturePreview').style.display = 'none';
+            signatureDataUrl = null;
+            companyLogoDataUrl = null;
+            
+            // Hide the PDF preview
+            document.getElementById('pdfPreview').classList.add('hidden');
+            pdfDoc = null;
+        }
+        
+        function downloadTemplate() {
+            // Create an Excel template
+            const template = {
+                "Employee Name": "",
+                "Employee ID": "",
+                "Date of Joining": "",
+                "Pay Period": "",
+                "Worked Days": 24,
+                "Basic Pay": 25000,
+                "Bonus": 0,
+                "Transport Allowance": 3000,
+                "House Rent Allowance": 0,
+                "Meal Allowance": 2000,
+                "PAYE": 1800,
+                "Advance": 0,
+                "CHAMAA": 0,
+                "Food": 0,
+                "Loans": 0
+            };
+            
+            const ws = XLSX.utils.json_to_sheet([template]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Payslip Data");
+            XLSX.writeFile(wb, "payslip-template.xlsx");
+        }
+        
+        function processBulkUpload() {
+            const file = document.getElementById('excelUpload').files[0];
+            if (!file) {
+                alert("Please select an Excel file first");
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                
+                if (jsonData.length === 0) {
+                    alert("No data found in the Excel file");
+                    return;
+                }
+                
+                // Create a zip folder for multiple PDFs if there are multiple employees
+                if (jsonData.length > 1) {
+                    alert(`Processing ${jsonData.length} employee records. This may take a moment...`);
+                    
+                    let processedCount = 0;
+                    const processNextEmployee = (index) => {
+                        if (index >= jsonData.length) {
+                            alert(`Processed ${processedCount} employee records successfully.`);
+                            return;
+                        }
+                        
+                        const employee = jsonData[index];
+                        
+                        // Populate form with employee data
+                        document.getElementById('employeeName').value = employee['Employee Name'] || '';
+                        document.getElementById('employeeId').value = employee['Employee ID'] || '';
+                        document.getElementById('joinDate').value = employee['Date of Joining'] || '';
+                        document.getElementById('payPeriod').value = employee['Pay Period'] || '';
+                        document.getElementById('workedDays').value = employee['Worked Days'] || 24;
+                        
+                        // Earnings
+                        document.getElementById('basicPay').value = employee['Basic Pay'] || 0;
+                        document.getElementById('bonus').value = employee['Bonus'] || 0;
+                        document.getElementById('transportAllowance').value = employee['Transport Allowance'] || 0;
+                        document.getElementById('houseRentAllowance').value = employee['House Rent Allowance'] || 0;
+                        document.getElementById('mealAllowance').value = employee['Meal Allowance'] || 0;
+                        
+                        // Deductions
+                        document.getElementById('paye').value = employee['PAYE'] || 0;
+                        document.getElementById('advance').value = employee['Advance'] || 0;
+                        document.getElementById('chamaa').value = employee['CHAMAA'] || 0;
+                        document.getElementById('food').value = employee['Food'] || 0;
+                        document.getElementById('loans').value = employee['Loans'] || 0;
+                        
+                        // Generate payslip
+                        generatePayslip();
+                        
+                        // Download PDF
+                        setTimeout(() => {
+                            if (pdfDoc) {
+                                const employeeName = document.getElementById('employeeName').value || 'employee';
+                                const payPeriod = document.getElementById('payPeriod').value || 'period';
+                                pdfDoc.save(`payslip-${employeeName}-${payPeriod}.pdf`);
+                                processedCount++;
+                            }
+                            
+                            // Process next employee after a short delay
+                            setTimeout(() => {
+                                processNextEmployee(index + 1);
+                            }, 500);
+                        }, 1000);
+                    };
+                    
+                    // Start processing
+                    processNextEmployee(0);
+                } else {
+                    // Process single employee
+                    const employee = jsonData[0];
+                    
+                    // Populate form with employee data
+                    document.getElementById('employeeName').value = employee['Employee Name'] || '';
+                    document.getElementById('employeeId').value = employee['Employee ID'] || '';
+                    document.getElementById('joinDate').value = employee['Date of Joining'] || '';
+                    document.getElementById('payPeriod').value = employee['Pay Period'] || '';
+                    document.getElementById('workedDays').value = employee['Worked Days'] || 24;
+                    
+                    // Earnings
+                    document.getElementById('basicPay').value = employee['Basic Pay'] || 0;
+                    document.getElementById('bonus').value = employee['Bonus'] || 0;
+                    document.getElementById('transportAllowance').value = employee['Transport Allowance'] || 0;
+                    document.getElementById('houseRentAllowance').value = employee['House Rent Allowance'] || 0;
+                    document.getElementById('mealAllowance').value = employee['Meal Allowance'] || 0;
+                    
+                    // Deductions
+                    document.getElementById('paye').value = employee['PAYE'] || 0;
+                    document.getElementById('advance').value = employee['Advance'] || 0;
+                    document.getElementById('chamaa').value = employee['CHAMAA'] || 0;
+                    document.getElementById('food').value = employee['Food'] || 0;
+                    document.getElementById('loans').value = employee['Loans'] || 0;
+                    
+                    // Generate payslip
+                    generatePayslip();
+                    alert('Payslip generated. Click "Download Payslip" to save it.');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
